@@ -11,16 +11,15 @@ import studentRoutes from "./routes/student.js";
 
 const app = express();
 
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:5174",
-      "http://127.0.0.1:5173",
-      "http://127.0.0.1:5174",
-    ],
-  })
-);
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  process.env.FRONTEND_URL, // deployed frontend URL (set on Render)
+].filter(Boolean);
+
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: "200kb" })); // source code is sent in the request body
 
 app.get("/api/health", async (req, res) => {
