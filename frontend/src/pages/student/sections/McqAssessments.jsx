@@ -1,0 +1,194 @@
+import { Link } from "react-router-dom";
+
+const fmtWhen = (iso) =>
+  new Date(iso).toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+// "in 3 hrs", "in 20 min", "in 2 days"
+function untilText(iso) {
+  const mins = Math.round((new Date(iso).getTime() - Date.now()) / 60000);
+  if (mins <= 0) return "now";
+  if (mins < 60) return `in ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `in ${hrs} ${hrs === 1 ? "hr" : "hrs"}`;
+  const days = Math.floor(hrs / 24);
+  return `in ${days} ${days === 1 ? "day" : "days"}`;
+}
+
+function windowText(e) {
+  if (e.start_time && e.end_time) return `Window: ${fmtWhen(e.start_time)} - ${fmtWhen(e.end_time)}`;
+  if (e.end_time) return `Closes ${fmtWhen(e.end_time)}`;
+  if (e.start_time) return `Opens ${fmtWhen(e.start_time)}`;
+  return "Open anytime";
+}
+
+// Course tag and a clean title ("CS401: Computer Networks" -> "Computer Networks")
+function labels(e) {
+  const code = e.course_code || "";
+  const tag = ["COURSE " + code, e.description].filter(Boolean).join(" • ").toUpperCase();
+  const prefix = `${code}:`;
+  const title = code && e.title.startsWith(prefix) ? e.title.slice(prefix.length).trim() : e.title;
+  return { tag: code ? tag : (e.description || "MCQ EXAM").toUpperCase(), title };
+}
+
+export default function McqAssessments({ exams = [] }) {
+  return (
+    <div className="flex flex-col gap-space-md">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-space-sm">
+          <div className="w-3 h-3 rounded bg-primary"></div>
+          <h2 className="font-headline-md text-headline-md text-on-surface font-bold">MCQ Assessments</h2>
+          <span className="font-telemetry-label text-telemetry-label bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded-full">
+            {exams.length} {exams.length === 1 ? "EXAM" : "EXAMS"}
+          </span>
+        </div>
+        <span className="font-telemetry-label text-telemetry-label text-on-surface-variant">TIMED MULTIPLE-CHOICE</span>
+      </div>
+
+      {exams.length === 0 ? (
+        <div className="rounded-xl bg-surface-container-low p-space-lg text-on-surface-variant text-center">
+          No MCQ exams have been published yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-space-lg">
+          {exams.map((e) => {
+            const { tag, title } = labels(e);
+            const active = e.state === "available" || e.state === "in_progress";
+
+            let footer;
+            if (e.state === "available") {
+              footer = (
+                <div className="flex items-center gap-1 font-telemetry-label text-telemetry-label text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[16px] text-tertiary">tab_unselected</span>
+                  Auto-submits after {e.max_violations} tab-switch warnings
+                </div>
+              );
+            } else if (e.state === "in_progress") {
+              footer = (
+                <div className="flex items-center gap-1 font-telemetry-label text-telemetry-label text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[16px] text-secondary">timer</span>
+                  About {Math.ceil(e.seconds_left / 60)} min were left when this page loaded
+                </div>
+              );
+            } else if (e.state === "upcoming") {
+              footer = (
+                <span className="font-telemetry-label text-telemetry-label text-on-surface-variant">
+                  Opens {untilText(e.start_time)}
+                </span>
+              );
+            } else if (e.state === "finished") {
+              footer = (
+                <div className="flex items-center gap-1 font-telemetry-label text-telemetry-label text-tertiary">
+                  <span className="material-symbols-outlined text-[16px]">task_alt</span>
+                  Score {e.score} / {e.max_score}
+                </div>
+              );
+            } else {
+              footer = (
+                <span className="font-telemetry-label text-telemetry-label text-on-surface-variant">
+                  The exam window has ended
+                </span>
+              );
+            }
+
+            return (
+              <div
+                key={e.id}
+                className={
+                  active
+                    ? "rounded-xl bg-surface-container p-space-lg shadow-xl flex flex-col justify-between"
+                    : "rounded-xl bg-surface-container-low p-space-lg shadow-md flex flex-col justify-between opacity-80 hover:opacity-100 transition-opacity"
+                }
+              >
+                <div className="flex flex-col gap-space-md">
+                  <div className="flex items-start justify-between gap-space-sm">
+                    <div className="flex flex-col min-w-0">
+                      <span className={`font-telemetry-label text-telemetry-label font-bold ${active ? "text-primary" : "text-outline"}`}>
+                        {tag}
+                      </span>
+                      <h3 className="font-headline-md text-headline-md text-on-surface font-semibold mt-1">{title}</h3>
+                    </div>
+
+                    {e.state === "available" && (
+                      <span className="font-telemetry-label text-telemetry-label text-on-primary bg-primary-container px-space-sm py-1 rounded shadow-sm font-bold flex items-center gap-1 h-fit whitespace-nowrap">
+                        <span className="w-2 h-2 rounded-full bg-tertiary animate-ping"></span>
+                        READY TO START
+                      </span>
+                    )}
+                    {e.state === "in_progress" && (
+                      <span className="font-telemetry-label text-telemetry-label text-secondary bg-secondary-container/30 px-space-sm py-1 rounded font-bold h-fit whitespace-nowrap">
+                        IN PROGRESS
+                      </span>
+                    )}
+                    {e.state === "upcoming" && (
+                      <span className="font-telemetry-label text-telemetry-label text-on-surface-variant bg-surface-container-highest px-space-sm py-1 rounded font-semibold h-fit">
+                        UPCOMING
+                      </span>
+                    )}
+                    {e.state === "finished" && (
+                      <span className="font-telemetry-label text-telemetry-label text-tertiary bg-tertiary-container/30 px-space-sm py-1 rounded font-bold h-fit">
+                        COMPLETED
+                      </span>
+                    )}
+                    {e.state === "closed" && (
+                      <span className="font-telemetry-label text-telemetry-label text-error bg-error-container/40 px-space-sm py-1 rounded font-bold h-fit">
+                        CLOSED
+                      </span>
+                    )}
+                  </div>
+
+                  <div className={`grid grid-cols-3 gap-space-xs p-space-sm rounded-lg text-center ${active ? "bg-surface-container-low" : "bg-surface-container"}`}>
+                    <div className="flex flex-col">
+                      <span className="font-telemetry-label text-telemetry-label text-on-surface-variant">DURATION</span>
+                      <span className="font-code-md text-code-md text-on-surface font-bold">{e.duration_minutes} Mins</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-telemetry-label text-telemetry-label text-on-surface-variant">QUESTIONS</span>
+                      <span className="font-code-md text-code-md text-on-surface font-bold">{e.question_count} MCQs</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-telemetry-label text-telemetry-label text-on-surface-variant">PENALTY</span>
+                      <span className={`font-code-md text-code-md font-bold ${e.negative_marking > 0 ? "text-error" : "text-on-surface"}`}>
+                        {e.negative_marking > 0 ? `-${e.negative_marking} Neg` : "None"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-space-sm text-on-surface-variant font-body-sm text-body-sm">
+                    <span className={`material-symbols-outlined text-[18px] ${active ? "text-primary" : "text-outline"}`}>schedule</span>
+                    <span>{windowText(e)}</span>
+                  </div>
+                </div>
+
+                <div className="mt-space-lg pt-space-md flex items-center justify-between gap-space-md">
+                  {footer}
+
+                  {active ? (
+                    <Link
+                      to={`/exam/mcq/${e.id}`}
+                      className="px-space-lg py-space-sm rounded-lg bg-primary text-on-primary font-headline-md text-body-md font-bold shadow-lg hover:opacity-90 active:scale-95 transition-all flex items-center gap-space-xs whitespace-nowrap"
+                    >
+                      <span>{e.state === "in_progress" ? "Resume Assessment" : "Start Assessment"}</span>
+                      <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                    </Link>
+                  ) : (
+                    <button
+                      disabled
+                      className="px-space-md py-space-sm rounded-lg bg-surface-container-highest text-on-surface-variant font-body-md text-body-md font-semibold cursor-not-allowed opacity-60 whitespace-nowrap"
+                    >
+                      {e.state === "finished" ? "Submitted" : e.state === "closed" ? "Window Closed" : "Not Yet Accessible"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
